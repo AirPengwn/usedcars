@@ -788,6 +788,97 @@
     .eval-input-row { flex-direction: column; }
     .eval-btn { width: 100%; justify-content: center; }
   }
+
+  /* API KEY GATE */
+  .api-key-gate {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .api-key-gate-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .api-key-gate-desc {
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .api-key-gate-desc a { color: var(--accent2); text-decoration: none; }
+  .api-key-gate-desc a:hover { text-decoration: underline; }
+  .api-key-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .api-key-input {
+    flex: 1;
+    min-width: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    padding: 0.6rem 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .api-key-input:focus { border-color: var(--accent); }
+  .api-key-input::placeholder { color: var(--muted); letter-spacing: 0; }
+  .api-key-save-btn {
+    background: var(--accent);
+    color: #0f0f11;
+    font-weight: 700;
+    font-size: 0.82rem;
+    padding: 0.6rem 1.1rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .api-key-save-btn:hover { background: #d4eb3a; }
+  .api-key-clear-btn {
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+  .api-key-clear-btn:hover { color: var(--danger); border-color: var(--danger); }
+  .api-key-status {
+    font-size: 0.72rem;
+    font-family: 'DM Mono', monospace;
+    padding: 0.3rem 0.6rem;
+    border-radius: 5px;
+  }
+  .api-key-status.set { color: var(--good); background: rgba(93,255,156,0.08); border: 1px solid rgba(93,255,156,0.2); }
+  .api-key-status.unset { color: var(--warn); background: rgba(255,179,71,0.08); border: 1px solid rgba(255,179,71,0.2); }
+  .api-key-privacy {
+    font-size: 0.68rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    opacity: 0.7;
+  }
+  .eval-main { display: none; }
+  .eval-main.unlocked { display: flex; flex-direction: column; gap: 0.75rem; }
 </style>
 </head>
 <body>
@@ -841,53 +932,89 @@
       </div>
     </div>
     <div class="evaluator-body">
-      <div class="eval-instructions">
-        Paste any car listing details below — <strong>year, make, model, trim, price, mileage, location, owners, accidents, VIN, any other details</strong> — and Claude will research the reliability, known issues for that exact year, compare it to the current top 5, and give it a score.
+
+      <!-- API KEY GATE -->
+      <div class="api-key-gate" id="api-key-gate">
+        <div class="api-key-gate-title">🔑 Anthropic API Key Required</div>
+        <div class="api-key-gate-desc">
+          This evaluator calls the Claude API directly from your browser. Your key is stored only in your browser's <code>sessionStorage</code> — it's never sent anywhere except <strong>api.anthropic.com</strong>.<br><br>
+          Get a free key at <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> — free tier includes enough credits to evaluate dozens of cars.
+        </div>
+        <div class="api-key-row">
+          <input
+            type="password"
+            class="api-key-input"
+            id="api-key-input"
+            placeholder="sk-ant-api03-..."
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button class="api-key-save-btn" onclick="saveApiKey()">Save Key</button>
+          <span class="api-key-status unset" id="api-key-status">⚠ No key set</span>
+        </div>
+        <div class="api-key-privacy">🔒 Stored in sessionStorage only · cleared when you close this tab · never logged or transmitted to anyone but Anthropic</div>
       </div>
-      <div class="eval-input-row">
-        <textarea
-          class="eval-textarea"
-          id="eval-input"
-          placeholder="Example:
+
+      <!-- MAIN EVALUATOR (shown after key is set) -->
+      <div class="eval-main" id="eval-main">
+
+        <!-- Key indicator bar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap;">
+          <div class="eval-instructions">
+            Paste any car listing details below — <strong>year, make, model, trim, price, mileage, location, owners, accidents, VIN, any other details</strong> — and Claude will research the reliability, known issues for that exact year, compare it to the current top 5, and give it a score.
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
+            <span class="api-key-status set" id="api-key-active-status">✓ API Key Set</span>
+            <button class="api-key-clear-btn" onclick="clearApiKey()">Change Key</button>
+          </div>
+        </div>
+
+        <div class="eval-input-row">
+          <textarea
+            class="eval-textarea"
+            id="eval-input"
+            placeholder="Example:
 2015 Toyota RAV4 XLE AWD
 $7,500 · 118,000 miles · Hamden CT
 2 owners · 0 accidents · clean title
 VIN: JTMRFREV6FD123456
 Heated seats, backup camera, roof rack"
-        ></textarea>
-        <button class="eval-btn" id="eval-btn" onclick="evaluateCar()">
-          <span>⚡</span> Evaluate
-        </button>
-      </div>
-
-      <!-- Loading -->
-      <div class="eval-loading" id="eval-loading">
-        <div class="eval-spinner"></div>
-        <span id="eval-loading-text">Researching reliability data...</span>
-      </div>
-
-      <!-- Error -->
-      <div class="eval-error" id="eval-error"></div>
-
-      <!-- Result -->
-      <div class="eval-result" id="eval-result">
-        <div class="eval-result-header">
-          <div class="eval-car-name" id="eval-result-name">—</div>
-          <div class="eval-score-badge">
-            <div class="eval-score" id="eval-result-score">—</div>
-            <div class="eval-score-label">/ 10<br>Score</div>
-          </div>
+          ></textarea>
+          <button class="eval-btn" id="eval-btn" onclick="evaluateCar()">
+            <span>⚡</span> Evaluate
+          </button>
         </div>
-        <div class="eval-verdict-banner" id="eval-result-verdict"></div>
-        <div class="eval-body-text" id="eval-result-body"></div>
-        <div class="eval-ranking-note" id="eval-result-ranking"></div>
-      </div>
 
-      <!-- History -->
-      <div id="eval-history-container" style="display:none">
-        <div class="eval-history-label">Previously Evaluated</div>
-        <div class="eval-history" id="eval-history"></div>
-      </div>
+        <!-- Loading -->
+        <div class="eval-loading" id="eval-loading">
+          <div class="eval-spinner"></div>
+          <span id="eval-loading-text">Researching reliability data...</span>
+        </div>
+
+        <!-- Error -->
+        <div class="eval-error" id="eval-error"></div>
+
+        <!-- Result -->
+        <div class="eval-result" id="eval-result">
+          <div class="eval-result-header">
+            <div class="eval-car-name" id="eval-result-name">—</div>
+            <div class="eval-score-badge">
+              <div class="eval-score" id="eval-result-score">—</div>
+              <div class="eval-score-label">/ 10<br>Score</div>
+            </div>
+          </div>
+          <div class="eval-verdict-banner" id="eval-result-verdict"></div>
+          <div class="eval-body-text" id="eval-result-body"></div>
+          <div class="eval-ranking-note" id="eval-result-ranking"></div>
+        </div>
+
+        <!-- History -->
+        <div id="eval-history-container" style="display:none">
+          <div class="eval-history-label">Previously Evaluated This Session</div>
+          <div class="eval-history" id="eval-history"></div>
+        </div>
+
+      </div><!-- end eval-main -->
 
     </div>
   </div>
@@ -1390,6 +1517,48 @@ Heated seats, backup camera, roof rack"
   document.getElementById('last-updated').textContent = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   document.getElementById('footer-date').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+  // ─── API KEY MANAGEMENT ──────────────────────────────────
+  function getApiKey() {
+    return sessionStorage.getItem('anthropic_api_key') || '';
+  }
+
+  function saveApiKey() {
+    const key = document.getElementById('api-key-input').value.trim();
+    if (!key || !key.startsWith('sk-ant-')) {
+      alert('Please enter a valid Anthropic API key starting with sk-ant-');
+      return;
+    }
+    sessionStorage.setItem('anthropic_api_key', key);
+    document.getElementById('api-key-input').value = '';
+    showEvaluator();
+  }
+
+  function clearApiKey() {
+    sessionStorage.removeItem('anthropic_api_key');
+    document.getElementById('eval-main').classList.remove('unlocked');
+    document.getElementById('api-key-gate').style.display = 'flex';
+    document.getElementById('api-key-gate').style.flexDirection = 'column';
+    document.getElementById('api-key-status').textContent = '⚠ No key set';
+    document.getElementById('api-key-status').className = 'api-key-status unset';
+  }
+
+  function showEvaluator() {
+    document.getElementById('api-key-gate').style.display = 'none';
+    document.getElementById('eval-main').classList.add('unlocked');
+    document.getElementById('api-key-active-status').textContent = '✓ API Key Set';
+  }
+
+  // Check on load if key already exists in session
+  (function checkExistingKey() {
+    if (getApiKey()) {
+      showEvaluator();
+    }
+    // Allow Enter key in API key input
+    document.getElementById('api-key-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') saveApiKey();
+    });
+  })();
+
   // ─── AVAILABILITY CHECK ──────────────────────────────────
   const listings = [
     { id: 1, url: 'https://www.cargurus.com/details/445755029', name: '2009 Ford Escape' },
@@ -1503,6 +1672,12 @@ AUTOMATIC SKIPS (always score below 4/10 regardless of price):
   }
 
   async function evaluateCar() {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      clearApiKey();
+      return;
+    }
+
     const input = document.getElementById('eval-input').value.trim();
     if (!input || input.length < 10) {
       document.getElementById('eval-error').textContent = '⚠ Please paste some listing details first.';
@@ -1541,7 +1716,12 @@ Please respond with ONLY a JSON object (no markdown, no backticks, just raw JSON
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
@@ -1553,46 +1733,44 @@ Please respond with ONLY a JSON object (no markdown, no backticks, just raw JSON
       stopLoadingAnimation();
       document.getElementById('eval-loading').classList.remove('visible');
 
-      if (!response.ok || !data.content) {
-        throw new Error(data.error?.message || 'API error');
+      if (!response.ok) {
+        // Handle specific API errors helpfully
+        if (response.status === 401) throw new Error('Invalid API key. Please check your key and try again.');
+        if (response.status === 429) throw new Error('Rate limit hit. Wait a moment and try again.');
+        throw new Error(data.error?.message || `API error ${response.status}`);
       }
+
+      if (!data.content) throw new Error('No response from API');
 
       const rawText = data.content
         .filter(b => b.type === 'text')
         .map(b => b.text)
         .join('');
 
-      // Parse JSON — strip any accidental markdown
       const clean = rawText.replace(/```json|```/g, '').trim();
       const result = JSON.parse(clean);
 
       // Display result
-      const nameEl = document.getElementById('eval-result-name');
-      const scoreEl = document.getElementById('eval-result-score');
-      const verdictEl = document.getElementById('eval-result-verdict');
-      const bodyEl = document.getElementById('eval-result-body');
-      const rankingEl = document.getElementById('eval-result-ranking');
-
-      nameEl.textContent = result.name || 'Unknown Vehicle';
+      document.getElementById('eval-result-name').textContent = result.name || 'Unknown Vehicle';
 
       const score = parseFloat(result.score) || 0;
+      const scoreEl = document.getElementById('eval-result-score');
       scoreEl.textContent = score.toFixed(1);
       scoreEl.className = 'eval-score ' + (score >= 7 ? 'score-high' : score >= 5 ? 'score-mid' : 'score-low');
 
       const verdict = (result.verdict || 'CAUTION').toUpperCase();
+      const verdictEl = document.getElementById('eval-result-verdict');
       verdictEl.textContent = verdict + ' — ' + (result.verdict_reason || '');
       verdictEl.className = 'eval-verdict-banner ' +
         (verdict === 'PURSUE' ? 'eval-verdict-pursue' :
          verdict === 'SKIP'   ? 'eval-verdict-skip'   : 'eval-verdict-caution');
 
-      // Format analysis with bold for key terms
       let analysisText = result.analysis || '';
       analysisText = analysisText
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>');
-      bodyEl.innerHTML = analysisText;
-
-      rankingEl.innerHTML = '<strong>Ranking:</strong> ' + (result.ranking_vs_top5 || '—');
+      document.getElementById('eval-result-body').innerHTML = analysisText;
+      document.getElementById('eval-result-ranking').innerHTML = '<strong>Ranking:</strong> ' + (result.ranking_vs_top5 || '—');
 
       document.getElementById('eval-result').classList.add('visible');
 
@@ -1600,16 +1778,18 @@ Please respond with ONLY a JSON object (no markdown, no backticks, just raw JSON
       evalHistory.unshift({ name: result.name, score, verdict, input });
       renderHistory();
 
-      // Scroll into view
       document.getElementById('eval-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     } catch (err) {
       stopLoadingAnimation();
       document.getElementById('eval-loading').classList.remove('visible');
-      document.getElementById('eval-error').textContent =
-        '⚠ Evaluation failed: ' + (err.message || 'Unknown error') +
-        '. Make sure the Anthropic API is accessible.';
+      document.getElementById('eval-error').textContent = '⚠ ' + (err.message || 'Unknown error. Check the browser console for details.');
       document.getElementById('eval-error').classList.add('visible');
+
+      // If auth error, show the key gate again
+      if (err.message && err.message.includes('Invalid API key')) {
+        setTimeout(clearApiKey, 2000);
+      }
       console.error('Eval error:', err);
     }
 
@@ -1634,9 +1814,10 @@ Please respond with ONLY a JSON object (no markdown, no backticks, just raw JSON
     evaluateCar();
   }
 
-  // Allow Ctrl+Enter to submit
-  document.getElementById('eval-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+  // Ctrl+Enter to submit
+  document.addEventListener('keydown', function(e) {
+    const ta = document.getElementById('eval-input');
+    if (ta && document.activeElement === ta && e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       evaluateCar();
     }
   });
